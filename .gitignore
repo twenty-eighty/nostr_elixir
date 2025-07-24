@@ -1,0 +1,30 @@
+# Elixir
+_build/
+deps/
+*.ez
+*.beam
+/config/*.secret.exs
+
+# Rust
+target/
+Cargo.lock
+
+# Documentation
+doc/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
