@@ -231,7 +231,7 @@ fn event_sign_nif(event_json: String, secret_key: String) -> NifResult<String> {
     // For now, we'll use a simplified approach since async signing is complex in NIFs
     // We'll create a signed event manually by computing the signature
     let event_id = unsigned_event.id.expect("Event ID should be present");
-    let message = Message::from_slice(event_id.as_bytes()).unwrap();
+    let message = Message::from_digest_slice(event_id.as_bytes()).unwrap();
     let signature = keys.sign_schnorr(&message);
     
     let result = serde_json::json!({
