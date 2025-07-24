@@ -1,6 +1,7 @@
 use rustler::NifResult;
 use nostr::prelude::*;
-use nostr::{EventBuilder, EventId, Filter, Kind, Tag, Timestamp};
+use nostr::{Event, EventBuilder, EventId, Filter, Kind, Tag, Timestamp};
+use nostr::secp256k1::Message;
 use serde_json;
 use std::str::FromStr;
 
@@ -205,7 +206,7 @@ fn event_new_nif(pubkey: String, content: String, kind: u16, tags_json: String) 
 #[rustler::nif]
 fn event_sign_nif(event_json: String, secret_key: String) -> NifResult<String> {
     let event_data: serde_json::Value = to_rustler_error(serde_json::from_str(&event_json))?;
-    let _keys = to_rustler_error(Keys::parse(&secret_key))?;
+    let keys = to_rustler_error(Keys::parse(&secret_key))?;
     
     let pubkey = to_rustler_error(PublicKey::from_hex(event_data["pubkey"].as_str().unwrap_or("")))?;
     let kind = Kind::from(event_data["kind"].as_u64().unwrap_or(0) as u16);
@@ -223,25 +224,39 @@ fn event_sign_nif(event_json: String, secret_key: String) -> NifResult<String> {
         })
         .collect();
     
-    let _unsigned_event = EventBuilder::new(kind, content)
+    let unsigned_event = EventBuilder::new(kind, content)
         .tags(tags)
         .build(pubkey);
     
-    // Note: This is a simplified version. In a real implementation, you'd need to handle async
-    // For now, we'll return an error indicating this needs async support
-    Err(rustler::Error::Term(Box::new("Event signing requires async support".to_string())))
+    // For now, we'll use a simplified approach since async signing is complex in NIFs
+    // We'll create a signed event manually by computing the signature
+    let event_id = unsigned_event.id.expect("Event ID should be present");
+    let message = Message::from_slice(event_id.as_bytes()).unwrap();
+    let signature = keys.sign_schnorr(&message);
+    
+    let result = serde_json::json!({
+        "id": event_id.to_string(),
+        "pubkey": unsigned_event.pubkey.to_string(),
+        "created_at": unsigned_event.created_at.as_u64(),
+        "kind": unsigned_event.kind.as_u16(),
+        "tags": unsigned_event.tags.to_vec().into_iter().map(|tag| tag.to_vec()).collect::<Vec<Vec<String>>>(),
+        "content": unsigned_event.content,
+        "sig": signature.to_string()
+    });
+    
+    Ok(result.to_string())
 }
 
 #[rustler::nif]
 fn event_verify_nif(event_json: String) -> NifResult<bool> {
     let event_data: serde_json::Value = to_rustler_error(serde_json::from_str(&event_json))?;
     
-    let _id = to_rustler_error(EventId::from_hex(event_data["id"].as_str().unwrap_or("")))?;
-    let _pubkey = to_rustler_error(PublicKey::from_hex(event_data["pubkey"].as_str().unwrap_or("")))?;
-    let _created_at = Timestamp::from(event_data["created_at"].as_u64().unwrap_or(0));
-    let _kind = Kind::from(event_data["kind"].as_u64().unwrap_or(0) as u16);
-    let _content = event_data["content"].as_str().unwrap_or("").to_string();
-    let _sig = to_rustler_error(Signature::from_str(event_data["sig"].as_str().unwrap_or("")))?;
+    let id = to_rustler_error(EventId::from_hex(event_data["id"].as_str().unwrap_or("")))?;
+    let pubkey = to_rustler_error(PublicKey::from_hex(event_data["pubkey"].as_str().unwrap_or("")))?;
+    let created_at = Timestamp::from(event_data["created_at"].as_u64().unwrap_or(0));
+    let kind = Kind::from(event_data["kind"].as_u64().unwrap_or(0) as u16);
+    let content = event_data["content"].as_str().unwrap_or("").to_string();
+    let sig = to_rustler_error(Signature::from_str(event_data["sig"].as_str().unwrap_or("")))?;
     
     let tags: Vec<Vec<String>> = event_data["tags"].as_array()
         .unwrap_or(&Vec::new())
@@ -249,16 +264,28 @@ fn event_verify_nif(event_json: String) -> NifResult<bool> {
         .map(|tag| tag.as_array().unwrap_or(&Vec::new()).iter().map(|v| v.as_str().unwrap_or("").to_string()).collect())
         .collect();
     
-    let _tags: Vec<Tag> = tags.into_iter()
+    let tags: Vec<Tag> = tags.into_iter()
         .map(|tag_vec| {
             to_rustler_error(Tag::parse(tag_vec)).unwrap_or_else(|_| Tag::parse(vec!["t", "unknown"]).unwrap())
         })
         .collect();
     
-    // Note: Event creation is complex and requires proper handling
-    // For now, we'll return false indicating verification failed
-    // In a real implementation, you'd need to properly construct the Event
-    Ok(false)
+    // Create the event and verify the signature
+    let event = Event::new(
+        id,
+        pubkey,
+        created_at,
+        kind,
+        tags,
+        content,
+        sig
+    );
+    
+    // Verify the signature
+    match event.verify() {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false)
+    }
 }
 
 #[rustler::nif]

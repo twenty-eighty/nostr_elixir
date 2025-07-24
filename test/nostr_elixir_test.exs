@@ -180,15 +180,6 @@ defmodule NostrElixirTest do
     # The nostr library may filter or process tags, so we just check they exist
   end
 
-  test "sign_event raises error for async requirement" do
-    keys = NostrElixir.generate_keypair()
-    event_json = NostrElixir.new_event(keys.public_key, "Hello", 1, [])
-
-    assert_raise ArgumentError, ~r/Event signing requires async support/, fn ->
-      NostrElixir.sign_event(event_json, keys.secret_key)
-    end
-  end
-
   test "verify_event returns false for now" do
     keys = NostrElixir.generate_keypair()
     event_json = NostrElixir.new_event(keys.public_key, "Hello", 1, [])
@@ -198,6 +189,13 @@ defmodule NostrElixirTest do
     assert_raise ArgumentError, ~r/malformed signature/, fn ->
       NostrElixir.verify_event(event_json)
     end
+  end
+
+  test "sign_event signs and verify_event verifies the event" do
+    keys = NostrElixir.generate_keypair()
+    event_json = NostrElixir.new_event(keys.public_key, "Hello, Nostr!", 1, [])
+    signed_event_json = NostrElixir.sign_event(event_json, keys.secret_key)
+    assert NostrElixir.verify_event(signed_event_json) == true
   end
 
   test "event_to_json and event_from_json work" do
@@ -241,19 +239,15 @@ defmodule NostrElixirTest do
   # Convenience function tests
   test "create_text_note creates and signs a text note" do
     keys = NostrElixir.generate_keypair()
-
-    assert_raise ArgumentError, ~r/Event signing requires async support/, fn ->
-      NostrElixir.create_text_note(keys, "Hello, Nostr!")
-    end
+    signed_event_json = NostrElixir.create_text_note(keys, "Hello, Nostr!")
+    assert NostrElixir.verify_event(signed_event_json) == true
   end
 
   test "create_metadata creates and signs a metadata event" do
     keys = NostrElixir.generate_keypair()
     metadata = %{name: "Alice", about: "Nostr user"}
-
-    assert_raise ArgumentError, ~r/Event signing requires async support/, fn ->
-      NostrElixir.create_metadata(keys, metadata)
-    end
+    signed_event_json = NostrElixir.create_metadata(keys, metadata)
+    assert NostrElixir.verify_event(signed_event_json) == true
   end
 
   test "follow_user creates a filter for following" do
