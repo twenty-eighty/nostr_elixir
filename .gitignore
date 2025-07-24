@@ -8,6 +8,7 @@ deps/
 # Rust
 target/
 Cargo.lock
+native/*/Cargo.lock
 
 # Compiled NIF binaries (platform-specific)
 priv/native/
