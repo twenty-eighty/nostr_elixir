@@ -9,6 +9,9 @@ deps/
 target/
 Cargo.lock
 
+# Compiled NIF binaries (platform-specific)
+priv/native/
+
 # Documentation
 doc/
 
