@@ -13,7 +13,8 @@ defmodule NostrElixir.MixProject do
       source_url: "https://github.com/your-username/nostr_elixir",
       docs: [
         main: "readme",
-        extras: ["README.md"]
+        extras: ["README.md"],
+        source_url: "https://github.com/your-username/nostr_elixir"
       ]
     ]
   end
@@ -29,7 +30,8 @@ defmodule NostrElixir.MixProject do
       {:rustler, "~> 0.32.0"},
       {:jason, "~> 1.4"},
       {:toml, "~> 0.7"},
-      {:ex_doc, "~> 0.29", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.29", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.3", only: [:dev], runtime: false}
     ]
   end
 
